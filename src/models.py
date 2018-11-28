@@ -211,7 +211,19 @@ class CustomResnet2(nn.Module):
         self.layer4 = encoder.layer4
 
         self.avgpool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(512 * (1 if encoder_depth in [18, 34] else 4), num_classes)
+        self.bottom_channel_nr = 512 * (1 if encoder_depth in [18, 34] else 4)
+        self.dropout_1d = .5
+        # self.fc = nn.Linear(self.bottom_channel_nr, num_classes)
+
+        self.fc = nn.Sequential(
+            nn.BatchNorm1d(self.bottom_channel_nr),
+            nn.Dropout(p=self.dropout_1d, inplace=True),
+            nn.Linear(self.bottom_channel_nr, self.bottom_channel_nr, bias=True),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm1d(self.bottom_channel_nr),
+            nn.Dropout(p=self.dropout_1d, inplace=True),
+            nn.Linear(self.bottom_channel_nr, num_classes, bias=True)
+        )
 
     def forward(self, x):
         x = self.conv1(x)
@@ -226,20 +238,27 @@ class CustomResnet2(nn.Module):
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        # x = self.relu(self.fc1(x))
-        # x = F.dropout(x, training=self.training)
-        # x = self.fc2(x)
+
         x = self.fc(x)
         return x
 
 
 if __name__ == '__main__':
-    dpn = Dpn('dpn68')
-    for m in dpn.modules():
-        print(m)
     import numpy as np
-    x = torch.from_numpy(np.zeros((1, 4, 224, 224), dtype=np.float32))
-    dpn.forward(x)
+
+    def test_dpn68():
+        dpn = Dpn('dpn68')
+        for m in dpn.modules():
+            print(m)
+        x = torch.from_numpy(np.zeros((1, 4, 224, 224), dtype=np.float32))
+        dpn.forward(x)
+
+    def test_resnet18():
+        m = get_model(None, 'resnet18')
+        m.forward(torch.from_numpy(np.zeros((32, 4, 512, 512), dtype=np.float32)).cuda())
+
+    test_resnet18()
+
 
 
 

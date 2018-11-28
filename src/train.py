@@ -42,8 +42,10 @@ def build_train_args():
     arg('--optimizer', type=str, default='adam', choices=['adam', 'sgd'])
     arg('--focal-gamma', type=float, default=1)  # .5
     arg('--num-channels', type=int, default=4)
-    arg('--weighted-sampler', action="store_true", default=True)
+    arg('--weighted-sampler', action="store_true", dest='weighted_sampler')
+    arg('--no-weighted-sampler', action="store_false", dest="weighted_sampler")
     arg('--resume', action="store_true")
+    parser.set_defaults(weighted_sampler=True)
     args = parser.parse_args()
     return args
 

@@ -77,15 +77,12 @@ def predict_tta(model, ids, output, kind='test', batch_size=32, n_tta=5):
             GaussNoise(),
             Blur()
         ]),
-        OneOf([
-            ElasticTransform(),
-            ShiftScaleRotate(
-                rotate_limit=45,
-                shift_limit=.15,
-                scale_limit=.15,
-                interpolation=cv2.INTER_CUBIC,
-                border_mode=cv2.BORDER_REPLICATE),
-        ]),
+        ShiftScaleRotate(
+            rotate_limit=45,
+            shift_limit=.15,
+            scale_limit=.15,
+            interpolation=cv2.INTER_CUBIC,
+            border_mode=cv2.BORDER_REPLICATE),
         Resize(dataset.SIZE, dataset.SIZE, interpolation=cv2.INTER_NEAREST),
         Normalize(mean=dataset.MEAN, std=dataset.STD)
     ])
@@ -95,6 +92,7 @@ def predict_tta(model, ids, output, kind='test', batch_size=32, n_tta=5):
         
     mean_preds = np.mean(preds, axis=0)
     np.save(output, mean_preds)
+
 
 def eval_fold(experiment_path, fold):
     model_path = os.path.join(experiment_path, f"model_{fold}.pth")    

@@ -14,10 +14,10 @@ from torch.utils.data.sampler import Sampler
 from albumentations import Compose, Resize, HorizontalFlip, VerticalFlip, OneOf, RandomBrightness, RandomContrast, RandomGamma, GaussNoise, Blur, ElasticTransform, ShiftScaleRotate, Normalize
 from albumentations.torch.functional import img_to_tensor
 
-SIZE = 224
+SIZE = 512
 PATH = '../input'
-TRAIN_PATH = os.path.join(PATH, f"train-{SIZE}")
-TEST_PATH = os.path.join(PATH, f"test-{SIZE}")
+TRAIN_PATH = os.path.join(PATH, f"train-{SIZE}") if SIZE != 512 else os.path.join(PATH, f"train")
+TEST_PATH = os.path.join(PATH, f"test-{SIZE}") if SIZE != 512 else os.path.join(PATH, f"test")
 DATA = '../data'
 NUM_CLASSES = 28
 
