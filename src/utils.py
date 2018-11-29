@@ -100,25 +100,18 @@ def train(experiment, output_dir, args,
                 loss = criterion(outputs, targets)
 
                 # acumulate gradient over iter_size batches
-#                 loss.backward()
-#                 batch_loss_value += loss.detach().cpu().numpy()
-
-#                 # accumulate gradient for n iters
-#                 if (i + 1) % iter_size == 0:
-#                     optimizer.step()
-#                     batch_loss_value /= iter_size
-#                     losses.append(batch_loss_value.item())
-#                     mean_loss = np.mean(losses[-smooth_mean:])
-
-#                     batch_loss_value = 0
-#                     optimizer.zero_grad()
-
-                optimizer.zero_grad()
                 loss.backward()
-                optimizer.step()
-                
-                losses.append(loss.item())
-                mean_loss = np.mean(losses[-smooth_mean:])
+                batch_loss_value += loss.detach().cpu().numpy()
+
+                # accumulate gradient for n iters
+                if i % iter_size == 0:
+                    optimizer.step()
+                    batch_loss_value /= iter_size
+                    losses.append(batch_loss_value.item())
+                    mean_loss = np.mean(losses[-smooth_mean:])
+
+                    batch_loss_value = 0
+                    optimizer.zero_grad()
 
                 step += 1
 
