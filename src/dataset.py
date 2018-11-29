@@ -11,7 +11,7 @@ from sklearn.model_selection import KFold
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import Sampler
-from albumentations import Compose, Resize, HorizontalFlip, VerticalFlip, OneOf, RandomBrightness, RandomContrast, RandomGamma, GaussNoise, Blur, ElasticTransform, ShiftScaleRotate, Normalize
+import albumentations
 from albumentations.torch.functional import img_to_tensor
 
 SIZE = 512
@@ -130,58 +130,70 @@ def get_sample_weights(train_ids):
 
 
 def train_transform_v0():
-    return Compose([
-        Resize(SIZE, SIZE),
-        # RandomCrop(SIZE*2, SIZE*2),
-        HorizontalFlip(p=0.5),
-        VerticalFlip(p=0.5),
-        OneOf([
-            RandomBrightness(),
-            RandomContrast(),
-            RandomGamma(),
-            GaussNoise(),
-            Blur()
+    return albumentations.Compose([
+        albumentations.Resize(SIZE, SIZE),
+        # albumentations.RandomCrop(SIZE*2, SIZE*2),
+        albumentations.HorizontalFlip(p=0.5),
+        albumentations.VerticalFlip(p=0.5),
+        albumentations.OneOf([
+            albumentations.RandomBrightness(),
+            albumentations.RandomContrast(),
+            albumentations.RandomGamma(),
+            albumentations.GaussNoise(),
+            albumentations.Blur()
         ]),
-        OneOf([
-            ElasticTransform(),
-            ShiftScaleRotate(
+        albumentations.OneOf([
+            albumentations.ElasticTransform(),
+            albumentations.ShiftScaleRotate(
                 rotate_limit=45,
                 shift_limit=.15,
                 scale_limit=.15,
                 interpolation=cv2.INTER_CUBIC,
                 border_mode=cv2.BORDER_REPLICATE),
         ]),
-        Resize(SIZE, SIZE),
-        Normalize(mean=MEAN, std=STD)
+        albumentations.Resize(SIZE, SIZE),
+        albumentations.Normalize(mean=MEAN, std=STD)
     ])
 
 
 def train_transform():
-    return Compose([
-        HorizontalFlip(p=0.5),
-        VerticalFlip(p=0.5),
-        OneOf([
-            RandomBrightness(),
-            RandomContrast(),
-            RandomGamma(),
-            GaussNoise(),
-            Blur()
+    # return albumentations.Compose([
+    #     albumentations.iaa.OneOf([
+    #         albumentations.IAAAffine(rotate=90),
+    #         albumentations.IAAAffine(rotate=180),
+    #         albumentations.IAAAffine(rotate=270),
+    #         albumentations.IAAAffine(shear=(-16, 16)),
+    #         albumentations.imgaug.transforms.IAAFliplr(),
+    #         albumentations.imgaug.transforms.IAAFlipup(),
+    #     ]),
+    #     albumentations.Resize(SIZE, SIZE),
+    #     albumentations.Normalize(mean=MEAN, std=STD)
+    # ])
+
+    return albumentations.Compose([
+        albumentations.Flip(),
+        albumentations.OneOf([
+            albumentations.RandomBrightness(),
+            albumentations.RandomContrast(),
+            albumentations.RandomGamma(),
+            albumentations.GaussNoise(),
+            albumentations.Blur(),
+            albumentations.ShiftScaleRotate(
+                rotate_limit=45,
+                shift_limit=.15,
+                scale_limit=.15,
+                interpolation=cv2.INTER_CUBIC,
+                border_mode=cv2.BORDER_REPLICATE),
         ]),
-        ShiftScaleRotate(
-            rotate_limit=45,
-            shift_limit=.15,
-            scale_limit=.15,
-            interpolation=cv2.INTER_CUBIC,
-            border_mode=cv2.BORDER_REPLICATE),        
-        Resize(SIZE, SIZE),
-        Normalize(mean=MEAN, std=STD)
+        albumentations.Resize(SIZE, SIZE),
+        albumentations.Normalize(mean=MEAN, std=STD)
     ])
 
 
 def val_transform():
-    return Compose([
-        Resize(SIZE, SIZE),
-        Normalize(mean=MEAN, std=STD)
+    return albumentations.Compose([
+        albumentations.Resize(SIZE, SIZE),
+        albumentations.Normalize(mean=MEAN, std=STD)
     ])
 
 
