@@ -75,7 +75,7 @@ def main():
     train_loader = dataset.make_loader(
         train_ids,
         num_channels=args.num_channels,
-        transform=dataset.train_transform_v0(),
+        transform=dataset.train_transform(),
         shuffle=True,
         weighted_sampling=args.weighted_sampler,
         batch_size=args.batch_size,
@@ -107,7 +107,7 @@ def main():
 
     loss = FocalLoss(gamma=args.focal_gamma)
     validation = validation_multi
-    scheduler = ReduceLROnPlateau(optimizer, verbose=True, min_lr=1e-7, factor=0.5, patience=10)
+    scheduler = ReduceLROnPlateau(optimizer, verbose=True, min_lr=1e-7, factor=0.5, patience=5)
     snapshot = utils.fold_snapshot(output_dir, args.fold) if args.resume else None
 
     device_ids = list(map(int, args.device_ids.split(','))) if args.device_ids else None
