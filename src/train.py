@@ -7,8 +7,6 @@ from validation import validation_multi
 
 import torch
 from torch import nn
-from torch.optim import Adam
-from torch.optim import SGD
 from torch.nn import functional as F
 
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -16,7 +14,7 @@ import torch.backends.cudnn as cudnn
 import torch.backends.cudnn
 
 # from loss import LossBinary, FocalLoss, LossLovasz, BCEDiceJaccardLoss, LossHinge
-from loss import FocalLoss
+import losses
 
 import dataset
 import models
@@ -31,13 +29,13 @@ def build_train_args():
     arg('--device-ids', type=str, default='0', help='For example 0,1 to run on two GPUs')
     arg('--fold', type=int, help='fold', default=0)
     arg('--output-dir', default='../data/runs', help='checkpoint root')
-    arg('--batch-size', type=int, default=64)
+    arg('--batch-size', type=int, default=32)
     arg('--iter-size', type=int, default=1)
-    arg('--n-epochs', type=int, default=100)
+    arg('--n-epochs', type=int, default=150)
     arg('--lr', type=float, default=0.001)
     arg('--workers', type=int, default=8)
     arg('--seed', type=int, default=0)
-    arg('--model', type=str, default=models.archs[0], choices=models.archs)
+    arg('--model', type=str, default='resnet18', choices=models.archs)
     arg('--loss', type=str, default='multi', choices=['multi'])
     arg('--optimizer', type=str, default='adam', choices=['adam', 'sgd'])
     arg('--focal-gamma', type=float, default=1)  # .5
@@ -45,7 +43,7 @@ def build_train_args():
     arg('--weighted-sampler', action="store_true", dest='weighted_sampler')
     arg('--no-weighted-sampler', action="store_false", dest="weighted_sampler")
     arg('--resume', action="store_true")
-    parser.set_defaults(weighted_sampler=True)
+    parser.set_defaults(weighted_sampler=False)
     args = parser.parse_args()
     return args
 
@@ -64,8 +62,8 @@ def main():
 
     # in case --resume is provided it will be loaded later
     # model = models.get_model(None, args.model)
-    # initial_model_path = os.path.join(output_dir, f"model_{args.fold}.pth")
-    initial_model_path = None
+    initial_model_path = os.path.join(output_dir, f"model_{args.fold}.pth")
+    # initial_model_path = None
     model = models.get_model(initial_model_path, args.model)
 
     train_ids, val_ids = dataset.get_split(args.fold)
@@ -90,24 +88,31 @@ def main():
         batch_size=args.batch_size,  # len(device_ids),
         workers=args.workers)
 
-    # train last layer only
-    # for m in model.children():
-    #     if m in [model.fc]:
-    #         continue
-    #     for param in m.parameters():
-    #         param.requires_grad = False
+#     train last layer only
+#     for m in model.children():
+#         if m in [model.fc]:
+#             continue
+#         for param in m.parameters():
+#             param.requires_grad = False
 
     # set all layers except fc to lr=0
-    fc_params = list(map(id, model.fc.parameters()))
-    base_params = filter(lambda p: id(p) not in fc_params, model.parameters())
-    optimizer = torch.optim.Adam([
-         {'params': base_params},
-         {'params': model.fc.parameters(), 'lr': args.lr}
-     ], lr=args.lr * 0.1)
+    #fc_params = list(map(id, model.fc.parameters()))
+    #base_params = filter(lambda p: id(p) not in fc_params, model.parameters())
+    #optimizer = torch.optim.Adam([
+    #     {'params': base_params},
+    #     {'params': model.fc.parameters(), 'lr': args.lr}
+    # ], lr=args.lr * 0.1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=1e-4)
 
-    loss = FocalLoss(gamma=args.focal_gamma)
-    validation = validation_multi
-    scheduler = ReduceLROnPlateau(optimizer, verbose=True, min_lr=1e-7, factor=0.5, patience=5)
+    # criterion = FocalLoss(gamma=args.focal_gamma)
+    # criterion = nn.BCEWithLogitsLoss().cuda()
+    criterion = losses.f1_loss
+        
+    validation_fn = validation_multi
+    scheduler = ReduceLROnPlateau(optimizer, 'max', verbose=True, min_lr=1e-7, factor=0.5, patience=5)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+
     snapshot = utils.fold_snapshot(output_dir, args.fold) if args.resume else None
 
     device_ids = list(map(int, args.device_ids.split(','))) if args.device_ids else None
@@ -138,11 +143,11 @@ def main():
         optimizer=optimizer,
         args=args,
         model=wrapped_model,
-        criterion=loss,
+        criterion=criterion,
         scheduler=scheduler,
         train_loader=train_loader,
         valid_loader=valid_loader,
-        validation=validation,
+        validation_fn=validation_fn,
         fold=args.fold,
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,

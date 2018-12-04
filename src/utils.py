@@ -12,7 +12,9 @@ import tqdm
 from torch import nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import SGD, Adam
+import sklearn
 
+import validation
 
 def fold_snapshot(output_dir, fold):
     fname = os.path.join(output_dir, f"model_{fold}.pth")
@@ -42,9 +44,26 @@ def save(model, optimizer, model_path, epoch, step, valid_best):
         'step': step,
     }, str(model_path))
 
+# evaluate meters
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
 
 def train(experiment, output_dir, args,
-          model, criterion, scheduler, train_loader, valid_loader, validation, optimizer,
+          model, criterion, scheduler, train_loader, valid_loader, validation_fn, optimizer,
           n_epochs=None, fold=None, batch_size=None, snapshot=None, iter_size=1, 
           extra_valid_loaders={},
           val_metric='val_f1'):
@@ -84,6 +103,12 @@ def train(experiment, output_dir, args,
         lr = get_learning_rate(optimizer)
         tq.set_description('Epoch {}, lr {}'.format(epoch, lr))
         losses = []
+
+        epoch_f1 = AverageMeter()
+        epoch_losses = AverageMeter()
+        debug_epoch_targets = None
+        debug_epoch_preds = None
+
         tl = train_loader
         try:
             mean_loss = 0
@@ -92,6 +117,9 @@ def train(experiment, output_dir, args,
 
             for i, (inputs, targets) in enumerate(tl):
                 inputs = cuda(inputs)
+                
+                if targets.size(0) == 1:
+                    continue # invalid batch
 
                 with torch.no_grad():
                     targets = cuda(targets)
@@ -99,28 +127,52 @@ def train(experiment, output_dir, args,
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
-                # acumulate gradient over iter_size batches
+                targets_npy = targets.cpu()
+                outputs_npy = outputs.detach().sigmoid().cpu()
+
+                epoch_losses.update(loss.item(), targets.size(0))
+                epoch_f1.update(sklearn.metrics.f1_score(targets, outputs_npy > 0.15, average='macro'))
+
+                if i == 0:
+                    debug_epoch_targets = targets_npy
+                    debug_epoch_preds = outputs_npy
+                else:
+                    debug_epoch_targets = np.concatenate([debug_epoch_targets, targets_npy])
+                    debug_epoch_preds = np.concatenate([debug_epoch_preds, outputs_npy])
+
+
+                optimizer.zero_grad()
                 loss.backward()
-                batch_loss_value += loss.detach().cpu().numpy()
+                optimizer.step()
 
-                # accumulate gradient for n iters
-                if i % iter_size == 0:
-                    optimizer.step()
-                    batch_loss_value /= iter_size
-                    losses.append(batch_loss_value.item())
-                    mean_loss = np.mean(losses[-smooth_mean:])
-
-                    batch_loss_value = 0
-                    optimizer.zero_grad()
+                # # acumulate gradient over iter_size batches
+                # loss.backward()
+                # batch_loss_value += loss.detach().cpu().numpy()
+                #
+                # # accumulate gradient for n iters
+                # if i % iter_size == 0:
+                #     optimizer.step()
+                #     batch_loss_value /= iter_size
+                #     losses.append(batch_loss_value.item())
+                #     mean_loss = np.mean(losses[-smooth_mean:])
+                #
+                #     batch_loss_value = 0
+                #     optimizer.zero_grad()
 
                 step += 1
 
-                tq.update(inputs.size(0))
-                tq.set_postfix(loss='{:.5f}'.format(mean_loss))
+                tq.update(targets.size(0))
+                tq.set_postfix(loss='{:.4f}'.format(epoch_losses.avg),
+                               f1='{:.4f}'.format(epoch_f1.avg))
 
+            #
+            # epoch end.
+            #
+            _, train_f1_mean = validation.f1_macro(debug_epoch_targets, debug_epoch_preds, debug=False)
+            print('train f1: ', train_f1_mean)
             tq.close()
 
-            valid_metrics = validation(model, criterion, valid_loader)
+            valid_metrics = validation_fn(model, criterion, valid_loader)
             scores.append([
                 "{:01d}".format(fold),
                 "{:03d}".format(epoch),
@@ -131,14 +183,15 @@ def train(experiment, output_dir, args,
             scores_df.to_csv(str(scores_fname), index=False)
             
             for name, extra_loader in extra_valid_loaders.items():
-                valid_metrics = validation(model, criterion, extra_loader)
+                valid_metrics = validation_fn(model, criterion, extra_loader)
                 print(name, valid_metrics)
 
             if valid_best is None or valid_metrics[val_metric] > valid_best:
                 valid_best = valid_metrics[val_metric]
                 save(model, optimizer, model_path, epoch, step, valid_best)
 
-            scheduler.step(valid_metrics['val_loss'])
+            # use metric for lr scheduler
+            scheduler.step(valid_metrics[val_metric]) 
 
         except KeyboardInterrupt:
             tq.close()

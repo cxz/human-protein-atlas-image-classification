@@ -66,19 +66,27 @@ def generate_folds():
     x.to_csv(os.path.join(DATA, 'folds.csv'), index=False)
 
 
+def ohe_label(s):
+    y = [0] * 28
+    for klazz_str in s.split():
+        klazz = int(klazz_str)
+        y[klazz] = 1
+    return y
+
+
 def generate_folds_stratified():
-    from sklearn.model_selection import StratifiedKFold
+    from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 
     n_fold = 5
-    df = pd.read_csv(os.path.join(PATH, 'train.csv'))
+    df = pd.read_csv(os.path.join('../input', 'train.csv'))
     ids = df.Id.values
-    labels = df.Target.values
+    labels = np.array([ohe_label(x) for x in df.Target.values])
     df['fold'] = 0
-    skf = StratifiedKFold(n_splits=n_fold, random_state=123, shuffle=True)
+    skf = MultilabelStratifiedKFold(n_splits=n_fold, random_state=123, shuffle=True)
     for fold_no, (train_idx, test_idx) in enumerate(skf.split(ids, labels)):
         df.loc[test_idx, 'fold'] = fold_no
     df.drop('Target', axis=1, inplace=True)
-    df.to_csv(os.path.join(DATA, 'folds.csv'), index=False)
+    df.to_csv(os.path.join('sfolds.csv'), index=False)
 
 
 def get_test_ids():
@@ -170,30 +178,40 @@ def train_transform():
     #     albumentations.Normalize(mean=MEAN, std=STD)
     # ])
 
+
+
     return albumentations.Compose([
-        albumentations.Flip(),
+        #albumentations.Flip(),
         albumentations.OneOf([
-            albumentations.RandomBrightness(),
-            albumentations.RandomContrast(),
+
+            albumentations.IAAAffine(rotate=90),
+            albumentations.IAAAffine(rotate=180),
+            albumentations.IAAAffine(rotate=270),
+            albumentations.IAAAffine(shear=(-16, 16)),
+            albumentations.IAAFliplr(),
+            albumentations.IAAFlipud(),
             albumentations.RandomGamma(),
-            albumentations.GaussNoise(),
-            albumentations.Blur(),
-            albumentations.ShiftScaleRotate(
-                rotate_limit=45,
-                shift_limit=.15,
-                scale_limit=.15,
-                interpolation=cv2.INTER_CUBIC,
-                border_mode=cv2.BORDER_REPLICATE),
+            albumentations.RandomContrast(),
+            # albumentations.GaussNoise(),
+            #albumentations.RandomBrightness(),
+            #albumentations.Blur(),
+            # albumentations.ShiftScaleRotate(
+            #     rotate_limit=45,
+            #     shift_limit=.0,
+            #     scale_limit=.0,
+            #     #interpolation=cv2.INTER_CUBIC,
+            #     #border_mode=cv2.BORDER_REPLICATE
+            #),
         ]),
-        albumentations.Resize(SIZE, SIZE),
-        albumentations.Normalize(mean=MEAN, std=STD)
+        albumentations.Resize(SIZE, SIZE)
+        # albumentations.Normalize(mean=MEAN, std=STD)
     ])
 
 
 def val_transform():
     return albumentations.Compose([
         albumentations.Resize(SIZE, SIZE),
-        albumentations.Normalize(mean=MEAN, std=STD)
+        # albumentations.Normalize(mean=MEAN, std=STD)
     ])
 
 

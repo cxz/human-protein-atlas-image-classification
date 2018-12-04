@@ -30,7 +30,7 @@ def f1_macro(y_true, y_pred, debug=True):
         klazz_f1_thr[klazz] = thresholds[np.argmax(f1)]
         if debug:
             print(f"class={klazz}, f1={np.max(f1)}, {f1}")
-    return klazz_f1_thr, np.mean(list(klazz_f1.values()))
+    return klazz_f1, np.mean(list(klazz_f1.values()))
 
 
 def validation_multi(model, criterion, valid_loader):
@@ -71,7 +71,7 @@ def validation_multi(model, criterion, valid_loader):
 
         valid_loss = np.mean(losses)
         _, valid_f1 = f1_macro(targets_npy, outputs_npy, debug=False)
-        valid_acc = (targets_npy == (outputs_npy > 0.5).astype(np.uint8)).mean()
+        valid_acc = (targets_npy == (outputs_npy > 0.15).astype(np.uint8)).mean()
 
         print("valid loss: {:.4f}, valid_f1: {:.4f}, valid_acc: {:.4f}".format(valid_loss, valid_f1, valid_acc))
         metrics = {'val_loss': valid_loss, 'val_f1': valid_f1, 'val_acc': valid_acc}

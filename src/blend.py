@@ -52,7 +52,9 @@ def evaluate(oof_pred):
 
 def main(write_submission=True):
     experiments = {
-        '../data/runs/resnet50-s224-v2': 1,        
+        # '../data/runs/resnet50-s224-v2': 1,
+        #'../data/runs/bninception-s512': 1,
+        '../data/runs/94499a78a0304845b4e885025560aba1': 1
     }
     
     train_df = pd.read_csv(os.path.join(dataset.PATH, 'train.csv'))
@@ -64,10 +66,10 @@ def main(write_submission=True):
         #
         # load validation & test set predictions
         #
-        folds = list(range(5))
+        folds = [0] # list(range(5))
         oof_pred = np.zeros((31072, 28), dtype=np.float32)
         fold_preds = []        
-        for fold in range(5):
+        for fold in folds:
             _, val_ids = dataset.get_split(fold)    
             val_idx = np.array(train_df[train_df.Id.isin(val_ids)].index)
             oof_pred[val_idx] = np.load(os.path.join(exp, f"val_preds_fold{fold}.npy"))

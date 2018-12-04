@@ -27,10 +27,10 @@ def build_args():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
     arg('--path', type=str, default='experiment folder', help='')
-    arg('--batch-size', type=int, default=64)
+    arg('--batch-size', type=int, default=32)
     arg('--fold', type=int, default=-1, choices=[0, 1, 2, 3, 4, -1], help='-1: all folds')    
     arg('--workers', type=int, default=8)
-    arg('--tta', type=int, default=10)
+    arg('--tta', type=int, default=5)
     args = parser.parse_args()
     return args
 
@@ -58,34 +58,12 @@ def predict(model, ids, transform, kind, batch_size=32):
 
 def predict_tta(model, ids, output, kind='test', batch_size=32, n_tta=5):
     size = dataset.SIZE
-    base_transform = Compose([
-        Resize(dataset.SIZE, dataset.SIZE, interpolation=cv2.INTER_NEAREST),
-        Normalize(mean=dataset.MEAN, std=dataset.STD)
-    ])
+    base_transform = dataset.val_transform()
     
     preds = np.zeros((1+n_tta, len(ids), dataset.NUM_CLASSES), dtype=np.float32)
     preds[0] = predict(model, ids, transform=base_transform, kind=kind, batch_size=batch_size)
             
-    tta_transform = Compose([
-        Resize(dataset.SIZE, dataset.SIZE),        
-        HorizontalFlip(p=0.5),
-        VerticalFlip(p=0.5),
-        OneOf([
-            RandomBrightness(),
-            RandomContrast(),
-            RandomGamma(),
-            GaussNoise(),
-            Blur()
-        ]),
-        ShiftScaleRotate(
-            rotate_limit=45,
-            shift_limit=.15,
-            scale_limit=.15,
-            interpolation=cv2.INTER_CUBIC,
-            border_mode=cv2.BORDER_REPLICATE),
-        Resize(dataset.SIZE, dataset.SIZE, interpolation=cv2.INTER_NEAREST),
-        Normalize(mean=dataset.MEAN, std=dataset.STD)
-    ])
+    tta_transform = dataset.train_transform()
     
     for tta_idx in range(1, n_tta):
         preds[tta_idx] = predict(model, ids, transform=tta_transform, kind=kind, batch_size=batch_size)
@@ -133,13 +111,13 @@ if __name__ == '__main__':
         model_path = os.path.join(args.path, f"model_{fold}.pth")
         model = models.get_model(model_path, model_type=model_type)
         model.eval()
-        print('loaded.')
+        print(f'{model_path} loaded.')
 
         print('predicting val set')
         val_output = os.path.join(args.path, f"val_preds_fold{fold}.npy")
         _, val_ids = dataset.get_split(fold)
         predict_tta(model, val_ids, val_output, kind='val', n_tta=args.tta)
-        
+
         valid_thresholds, valid_f1 = eval_fold(args.path, fold)
         print(f'fold {fold}: {valid_f1}')
 
