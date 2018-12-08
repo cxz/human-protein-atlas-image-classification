@@ -123,17 +123,14 @@ def get_weights_by_class():
     return freq, weight
 
 
-def get_sample_weights(train_ids):
+def get_sample_weights(train_ids):    
     df = pd.read_csv(os.path.join(PATH, 'train.csv'))
     d = df.set_index('Id').to_dict()['Target']
     freq, weight = get_weights_by_class()
     sample_weights = []
     for id_ in train_ids:
         klazzes = [int(x) for x in d[id_].split(' ')]
-        # TODO: this is wrong.
-        # get better function from notebook
-        total_freq = sum([freq[k] for k in klazzes])
-        sample_weights.append(1./total_freq)
+        sample_weights.append(1)
     return sample_weights
 
 
@@ -265,7 +262,7 @@ class HPAICDataset(Dataset):
 
     def load_image(self, image_id):
         base_path = TEST_PATH if self.mode == 'test' else TRAIN_PATH
-        kinds = ['red', 'green', 'blue', 'yellow']
+        kinds = ['red', 'blue', 'yellow', 'green']
         img = None
         flags = cv2.IMREAD_GRAYSCALE
         for idx, kind in enumerate(kinds):
