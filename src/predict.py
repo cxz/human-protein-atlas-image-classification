@@ -89,8 +89,8 @@ def eval_fold(experiment_path, fold):
     targets = np.array([val_target[id_] for id_ in val_ids], np.uint8)            
     valid_thresholds, valid_f1 = validation.f1_macro(targets, val_preds, debug=False)
     
-    with open(f"val_preds_fold{fold}_thresholds.json", 'w') as f:
-        f.write(json.dumps(valid_thresholds, indent=4))        
+    #with open(f"val_preds_fold{fold}_thresholds.json", 'w') as f:
+    #    f.write(json.dumps(valid_thresholds, indent=4))        
 
     return valid_thresholds, valid_f1    
     
