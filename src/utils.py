@@ -16,6 +16,7 @@ import sklearn
 
 import validation
 
+
 def fold_snapshot(output_dir, fold):
     fname = os.path.join(output_dir, f"model_{fold}.pth")
     return fname if os.path.exists(fname) else None
@@ -44,6 +45,7 @@ def save(model, optimizer, model_path, epoch, step, valid_best):
         'step': step,
     }, str(model_path))
 
+
 # evaluate meters
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -61,6 +63,7 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
 
 def train(experiment, output_dir, args,
           model, criterion, scheduler, train_loader, valid_loader, validation_fn, optimizer,

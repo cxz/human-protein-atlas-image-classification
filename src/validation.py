@@ -69,12 +69,11 @@ def validation_multi(model, criterion, valid_loader):
         targets_npy = np.squeeze(np.array(targets_npy).astype(np.uint8))
         outputs_npy = np.squeeze(np.array(outputs_npy).astype(np.float32))
 
-        valid_loss = np.mean(losses)
-        _, valid_f1 = f1_macro(targets_npy, outputs_npy, debug=False)
-        valid_acc = (targets_npy == (outputs_npy > 0.15).astype(np.uint8)).mean()
+        val_loss = np.mean(losses)
+        _, val_f1 = f1_macro(targets_npy, outputs_npy, debug=False)
 
-        print("valid loss: {:.4f}, valid_f1: {:.4f}, valid_acc: {:.4f}".format(valid_loss, valid_f1, valid_acc))
-        metrics = {'val_loss': valid_loss, 'val_f1': valid_f1, 'val_acc': valid_acc}
+        print("val_loss: {:.4f}, val_f1: {:.4f}".format(val_loss, val_f1))
+        metrics = {'val_loss': val_loss, 'val_f1': val_f1}
         return metrics
 
 
