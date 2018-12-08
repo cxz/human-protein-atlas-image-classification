@@ -2,14 +2,14 @@ import os
 import argparse
 import json
 import uuid
+import random
 from pathlib import Path
-from validation import validation_multi
 
 import torch
 from torch import nn
 from torch.nn import functional as F
 
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+
 import torch.backends.cudnn as cudnn
 import torch.backends.cudnn
 
@@ -19,7 +19,8 @@ import losses
 import dataset
 import models
 import utils
-import random
+import losses
+from validation import validation_multi
 
 
 def build_train_args():
@@ -43,6 +44,7 @@ def build_train_args():
     arg('--weighted-sampler', action="store_true", dest='weighted_sampler')
     arg('--no-weighted-sampler', action="store_false", dest="weighted_sampler")
     arg('--resume', action="store_true")
+    arg('--load-weights', action="store_true")
     parser.set_defaults(weighted_sampler=False)
     args = parser.parse_args()
     return args
@@ -60,10 +62,8 @@ def main():
     output_dir.mkdir(exist_ok=True, parents=True)
     output_dir.joinpath('params.json').write_text(json.dumps(vars(args), indent=True, sort_keys=True))
 
-    # in case --resume is provided it will be loaded later
-    # model = models.get_model(None, args.model)
-    initial_model_path = os.path.join(output_dir, f"model_{args.fold}.pth")
-    # initial_model_path = None
+    # this is different than --resume, which loads optimizer state as well
+    initial_model_path = os.path.join(output_dir, f"model_{args.fold}.pth") if args.load_weights else None
     model = models.get_model(initial_model_path, args.model)
 
     train_ids, val_ids = dataset.get_split(args.fold)
@@ -99,19 +99,20 @@ def main():
     #fc_params = list(map(id, model.fc.parameters()))
     #base_params = filter(lambda p: id(p) not in fc_params, model.parameters())
     #optimizer = torch.optim.Adam([
-    #     {'params': base_params},
+    #     {'params': base_params, 'lr': args.lr * 0.001},
     #     {'params': model.fc.parameters(), 'lr': args.lr}
-    # ], lr=args.lr * 0.1)
+    #], lr=args.lr * 0.001)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     # optimizer = torch.optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=1e-4)
 
     # criterion = FocalLoss(gamma=args.focal_gamma)
-    # criterion = nn.BCEWithLogitsLoss().cuda()
-    criterion = losses.f1_loss
+    criterion = nn.BCEWithLogitsLoss().cuda()
+    # criterion = losses.f1_loss
         
     validation_fn = validation_multi
-    scheduler = ReduceLROnPlateau(optimizer, 'max', verbose=True, min_lr=1e-7, factor=0.5, patience=5)
-    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    #    optimizer, mode='max', verbose=True, min_lr=1e-7, factor=0.5, patience=5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     snapshot = utils.fold_snapshot(output_dir, args.fold) if args.resume else None
 
